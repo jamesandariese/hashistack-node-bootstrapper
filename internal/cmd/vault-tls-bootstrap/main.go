@@ -82,6 +82,7 @@ func findToken() (string, error) {
 var ErrNoAuthMountFound = errors.New("Could not find matching auth mount")
 
 func getAuthMountAccessor(mount string, client *vault.Client) (string, error) {
+	mount = strings.TrimSuffix(mount, "/") + "/"
 	authMounts, err := client.Sys().ListAuth()
 	if err != nil {
 		return "", err
@@ -188,7 +189,7 @@ var (
 	ttl                    string
 	altNames               []string
 	vaultAddr              string
-	consulNodeSubdomain    string
+	certAuthMount          string
 	pkiSecretMount         string
 	pkiSecretRole          string
 	pkiSecretSudoRole      string
@@ -203,24 +204,27 @@ var (
 )
 
 func init() {
-	flagSet = flag.NewFlagSet("Vault TLS Bootstrapper", flag.ExitOnError)
+	flagSet = flag.NewFlagSet("Vault TLS Bootstrapper", flag.ContinueOnError)
 	ttl = "3h"
 	vaultAddr = "https://vault.service.consul:8200"
 	flagSet.StringVar(&vaultAddr, "vault-addr", vaultAddr, `https url for vault (_must_ be https)`)
-	consulNodeSubdomain = "node.dc1.consul"
-	flagSet.StringVar(&consulNodeSubdomain, "consul-node-subdomain", consulNodeSubdomain, "consul subdomain where individual nodes are found")
 	flagSet.StringVar(&consulTld, "consul-tld", "consul", "TLD for dns lookups in consul")
 	flagSet.StringVar(&consulDatacenter, "consul-dc", "dc1", "datacenter in consul where this host will be registered")
+	certAuthMount = "cert"
+	flagSet.Func("cert-auth-mount", "auth mount for generated cert to auth against", func(s string) error {
+		certAuthMount = strings.TrimSuffix(s, "/")
+		return nil
+	})
 	flagSet.Func("alt-name", "SAN domain name to add to cert (may be repeated)", func(s string) error {
 		altNames = append(altNames, s)
 		return nil
 	})
-	pkiSecretMount = "consul_pki"
-	pkiSecretRole = "consul-client"
-	pkiSecretSudoRole = pkiSecretRole + "-sudo"
-	consulHttpAddr = "https://consul.service.consul:8501"
-	vaultConsulSecretPath = "consul"
-	vaultConsulManagerRole = "manager"
+	flagSet.StringVar(&pkiSecretMount, "vault-pki-mount", "consul_pki", "vault pki secret mount for consul certificate generation")
+	flagSet.StringVar(&pkiSecretRole, "vault-pki-role", "consul-client", "vault role in pki mount which may create certificates for its own nodename")
+	flagSet.StringVar(&pkiSecretSudoRole, "vault-pki-sudo-role", "consul-client-sudo", "vault role in pki mount which may create certificates for other hosts")
+	flagSet.StringVar(&consulHttpAddr, "consul-addr", "https://consul.service.consul:8501", "address of consul API")
+	flagSet.StringVar(&vaultConsulSecretPath, "vault-consul-secret-path", "consul", "FIXME")
+	flagSet.StringVar(&vaultConsulManagerRole, "vault-consul-manager-role", "manager", "FIXME")
 }
 
 func issueCert(client *vault.Client, mount, role, commonName string, altNames []string, ttl string) (*vault.Secret, error) {
@@ -280,13 +284,23 @@ func RunCLI(args []string) int {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	if err := flagSet.Parse(args[1:]); err != nil {
-		log.Fatalln("couldn't parse args", err)
+		if err == flag.ErrHelp {
+			return 2
+		}
+		log.Println("couldn't parse args", err)
+		return 2
 	}
 
 	altNames = append(altNames, "client."+consulDatacenter+"."+consulTld)
 
 	baseName = flagSet.Arg(0)
-	commonName = baseName + "." + consulNodeSubdomain
+
+	if baseName == "" {
+		flagSet.Usage()
+		return 2
+	}
+
+	commonName = strings.Join([]string{baseName, "node", consulDatacenter, consulTld}, ".")
 
 	config := vault.DefaultConfig()
 
@@ -294,48 +308,62 @@ func RunCLI(args []string) int {
 
 	client, err := vault.NewClient(config)
 	if err != nil {
-		log.Fatalf("unable to initialize Vault client: %v", err)
+		log.Printf("unable to initialize Vault client: %v", err)
+		return 3
 	}
 	token, err := findToken()
 	if err != nil {
-		log.Fatalln("could not find a token to use", err)
+		log.Println("could not find a token to use", err)
+		return 4
 	}
 	client.SetToken(token)
 
 	log.Println(client.Auth().Token().RenewSelf(0))
 
-	getAuthMountAccessor("cert/", client)
+	certAccessor, err := getAuthMountAccessor(certAuthMount, client)
+	if err != nil {
+		log.Println("could not find mount accessor")
+		return 5
+	}
+	_ = certAccessor
 
 	cubby, err := createCubbyhole(client)
 	if err != nil {
-		log.Fatalln("could not create cubbyhole client", err)
+		log.Println("could not create cubbyhole client", err)
+		return 6
 	}
 	_ = cubby
 
 	cert, err := issueCert(client, pkiSecretMount, pkiSecretSudoRole, commonName, altNames, "5m")
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		return 7
 	}
-	certClient, err := vaultCertClient(client.CloneConfig(), "cert", cert)
+	certClient, err := vaultCertClient(client.CloneConfig(), certAuthMount, cert)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		return 8
 	}
 	cert2, err := issueCert(certClient, pkiSecretMount, pkiSecretRole, commonName, altNames, "5m")
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		return 9
 	}
-	cert2Client, err := vaultCertClient(client.CloneConfig(), "cert", cert2)
+	cert2Client, err := vaultCertClient(client.CloneConfig(), certAuthMount, cert2)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		return 10
 	}
 	cert3, err := issueCert(cert2Client, pkiSecretMount, pkiSecretRole, commonName, altNames, "72h")
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
+		return 11
 	}
 
 	_, err = cubby.Logical().Write("cubbyhole/cert", cert3.Data)
 	if err != nil {
-		log.Fatalln("Could not set cubbyhole/cert", err)
+		log.Println("Could not set cubbyhole/cert", err)
+		return 12
 	}
 
 	log.Println("Cubby token:", cubby.Token())
