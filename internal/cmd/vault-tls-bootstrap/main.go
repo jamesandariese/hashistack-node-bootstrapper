@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	vault "github.com/hashicorp/vault/api"
+	"github.com/jamesandariese/hashistack-node-bootstrapper/version"
 	"github.com/kr/pretty"
 )
 
@@ -201,10 +203,12 @@ var (
 	flagSet                *flag.FlagSet
 	consulTld              string
 	consulDatacenter       string
+	versionRequested       bool
 )
 
 func init() {
 	flagSet = flag.NewFlagSet("Vault TLS Bootstrapper", flag.ContinueOnError)
+	flagSet.BoolVar(&versionRequested, "version", false, "print version and exit")
 	ttl = "3h"
 	vaultAddr = "https://vault.service.consul:8200"
 	flagSet.StringVar(&vaultAddr, "vault-addr", vaultAddr, `https url for vault (_must_ be https)`)
@@ -289,6 +293,11 @@ func RunCLI(args []string) int {
 		}
 		log.Println("couldn't parse args", err)
 		return 2
+	}
+
+	if versionRequested {
+		fmt.Println(version.Version)
+		return 0
 	}
 
 	altNames = append(altNames, "client."+consulDatacenter+"."+consulTld)
