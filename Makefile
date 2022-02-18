@@ -22,6 +22,6 @@ enable-hooks:
 	git config --local core.hooksPath .githooks
 
 GOMOD=$(shell go list -m)
-build/vault-tls-bootstrap: version/version.go
+build/vault-tls-bootstrap: dist-clean
 	go build -o build/vault-tls-bootstrap $(GOMOD)/cmd/vault-tls-bootstrap 
 
