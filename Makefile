@@ -1,6 +1,8 @@
+.PHONY: all always-build
+
 all: README.md
 
-README.md: README.md.tmpl
+README.md: README.md.tmpl always-build
 	gomplate < README.md.tmpl > README.md
 
 dist-clean:

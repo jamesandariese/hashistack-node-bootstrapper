@@ -22,4 +22,4 @@ Creates a token for `NODENAME.node.dc1.consul` with SAN for `client.dc1.consul`.
 
 #### Install
 
-go install github.com/jamesandariese/hashistack-node-bootstrapper/cmd/vault-tls-bootstrap@v0.0.5
+go install github.com/jamesandariese/hashistack-node-bootstrapper/cmd/vault-tls-bootstrap@latest
