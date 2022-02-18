@@ -1,6 +1,6 @@
 .PHONY: all always-build
 
-all: README.md version/version.go build/vault-tls-bootstrap
+all: build/vault-tls-bootstrap
 
 README.md: README.md.tmpl always-build
 	gomplate < README.md.tmpl > README.md
@@ -9,7 +9,7 @@ version/version.go: version/version.go.tmpl always-build
 	gomplate < version/version.go.tmpl > version/version.go
 
 dist-clean:
-	rm -f README.md
+	git checkout -- README.md version/version.go
 
 prepare-release: prepare-release-preflight prepare-release-do-it
 prepare-release-preflight:
