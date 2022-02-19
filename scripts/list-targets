@@ -1,0 +1,3 @@
+#!/bin/bash
+
+go tool dist list -json | jq -r --arg GOOS 'linux darwin' '($GOOS|split(" ")) as $oslist | .[]|select(.CgoSupported)|.GOOS as $curos|select($oslist[] | . == $curos)|"\(.GOOS)/\(.GOARCH)"'

@@ -1,6 +1,8 @@
 .PHONY: all always-build
 
-all: build/vault-tls-bootstrap
+HASH := \#
+
+all: README.md xbuild
 
 README.md: README.md.tmpl always-build
 	gomplate < README.md.tmpl > README.md
@@ -10,6 +12,7 @@ version/version.go: version/version.go.tmpl always-build
 
 dist-clean:
 	git checkout -- README.md version/version.go
+
 
 prepare-release: prepare-release-preflight prepare-release-do-it
 prepare-release-preflight:
@@ -21,7 +24,5 @@ prepare-release-do-it: dist-clean README.md version/version.go
 enable-hooks:
 	git config --local core.hooksPath .githooks
 
-GOMOD=$(shell go list -m)
-build/vault-tls-bootstrap: dist-clean
-	go build -o build/vault-tls-bootstrap $(GOMOD)/cmd/vault-tls-bootstrap 
-
+xbuild:
+	scripts/xbuild

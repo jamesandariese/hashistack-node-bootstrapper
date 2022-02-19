@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -x
+set -e
+
+cd "$(dirname "$0")/.." || exit 1
+
+TARGET_PLATFORMS="$(scripts/list-targets)"
+GOMOD="$(go list -m)"
+
+for f in cmd/*;do
+    if [ ! -d "$f" ];then
+        continue
+    fi
+    CMD="${f##*/}"
+    for t in $TARGET_PLATFORMS;do
+        export GOOS="${t%/*}"
+        export GOARCH="${t#*/}"
+        TARGET="build/${CMD}_${GOOS}_${GOARCH}"
+        go build -o "$TARGET" "$GOMOD/cmd/${CMD}"
+    done
+done
