@@ -2,8 +2,8 @@ name: Release releases
 
 on:
   push:
-    branches:
-    - 'release/v**'
+    tags:
+    - 'v*.*.*'
 
 jobs:
   build:
@@ -18,3 +18,7 @@ jobs:
     
     - name: Build
       run: make
+    - name: Release
+      uses: softprops/action-gh-release@v1
+        files: build/*
+
