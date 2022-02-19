@@ -2,7 +2,7 @@
 
 HASH := \#
 
-all: README.md xbuild
+all: xbuild
 
 README.md: README.md.tmpl always-build
 	gomplate < README.md.tmpl > README.md
