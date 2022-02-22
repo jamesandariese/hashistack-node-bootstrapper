@@ -6,6 +6,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/hashicorp/consul/api v1.11.0
 	github.com/hashicorp/vault/api v1.3.1
+	github.com/jamesandariese/zerolog_cli_adapter v0.0.0-20220222145953-8059f5bd513c
 	github.com/rs/zerolog v1.26.1
 )
 
