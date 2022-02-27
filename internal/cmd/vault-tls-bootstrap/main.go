@@ -414,12 +414,11 @@ func (my *Program) linkConsulIdentity(vaultClient *vault.Client, consulClient *c
 
 	policy, _, err := aclClient.PolicyReadByName(consulPolicyName, nil)
 	if err != nil {
-		my.logger.Error().Err(err).Msg("error looking up policy " + consulPolicyName)
-		return err
+		my.logger.Debug().Err(err).Msgf("error looking up policy %s.  continuing anyway since it may simply not exist.", consulPolicyName)
 	}
 	if policy == nil {
 		my.logger.Debug().Msg("No existing policy named " + consulPolicyName + " found.  Creating a new one.")
-		_, _, err = aclClient.PolicyCreate(policy, nil)
+		_, _, err = aclClient.PolicyCreate(addRulesToPolicy(nil), nil)
 		if err != nil {
 			my.logger.Error().Err(err).Msg("Couldn't create policy")
 			return err
